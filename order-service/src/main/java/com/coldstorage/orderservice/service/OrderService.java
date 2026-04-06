@@ -4,12 +4,15 @@ import com.coldstorage.orderservice.dto.CreateOrderRequest;
 import com.coldstorage.orderservice.dto.OrderResponse;
 import com.coldstorage.orderservice.entity.Order;
 import com.coldstorage.orderservice.entity.OrderStatus;
+import com.coldstorage.orderservice.event.OrderCancelledEvent;
+import com.coldstorage.orderservice.event.OrderCreatedEvent;
 import com.coldstorage.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
@@ -18,6 +21,7 @@ import java.util.UUID;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderEventPublisher eventPublisher;
 
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
@@ -34,6 +38,19 @@ public class OrderService {
 
         Order savedOrder = orderRepository.save(order);
         log.info("Order created successfully with ID: {}", savedOrder.getOrderId());
+
+        // Publish event to Kafka
+        OrderCreatedEvent event = OrderCreatedEvent.builder()
+                .orderId(savedOrder.getOrderId())
+                .productId(savedOrder.getProductId())
+                .warehouseLocation(savedOrder.getWarehouseLocation())
+                .quantity(savedOrder.getQuantity())
+                .temperatureZone(savedOrder.getTemperatureZone())
+                .correlationId(savedOrder.getCorrelationId())
+                .createdAt(savedOrder.getCreatedAt())
+                .build();
+
+        eventPublisher.publishOrderCreated(event);
 
         return mapToResponse(savedOrder);
     }
@@ -62,7 +79,18 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELLED);
         Order savedOrder = orderRepository.save(order);
 
-        log.info("Order cancelled successfully with ID: {}", orderId);
+        // Publish event to Kafka
+        OrderCancelledEvent event = OrderCancelledEvent.builder()
+                .orderId(savedOrder.getOrderId())
+                .productId(savedOrder.getProductId())
+                .warehouseLocation(savedOrder.getWarehouseLocation())
+                .quantity(savedOrder.getQuantity())
+                .correlationId(savedOrder.getCorrelationId())
+                .cancelledAt(LocalDateTime.now())
+                .build();
+
+        eventPublisher.publishOrderCancelled(event);
+
         return mapToResponse(savedOrder);
     }
 
