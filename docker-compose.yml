@@ -11,6 +11,18 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  inventory-db:
+    image: postgres:15
+    container_name: cold-storage-inventory-db
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - inventory_db_data:/var/lib/postgresql/data
+
   redis:
     image: redis:7-alpine
     container_name: cold-storage-redis
@@ -40,3 +52,4 @@ services:
 
 volumes:
   postgres_data:
+  inventory_db_data:
